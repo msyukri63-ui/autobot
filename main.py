@@ -10,11 +10,44 @@ import feedparser
 from bs4 import BeautifulSoup
 from newspaper import Article
 from slugify import slugify
+from dotenv import load_dotenv
 
 from google import genai
 from google.genai import types
 
-from config import *
+# =========================================
+# LOAD ENV
+# =========================================
+
+load_dotenv()
+
+GEMINI_API_KEYS = os.getenv("GEMINI_API_KEYS", "").split(",")
+
+MODELS = os.getenv(
+    "MODELS",
+    "gemini-2.0-flash,gemini-2.5-flash"
+).split(",")
+
+RSS_FEED_URL = os.getenv("RSS_FEED_URL")
+
+WORDPRESS_URL = os.getenv("WORDPRESS_URL")
+
+WORDPRESS_MEDIA_URL = os.getenv("WORDPRESS_MEDIA_URL")
+
+WORDPRESS_TAGS_URL = os.getenv(
+    "WORDPRESS_TAGS_URL",
+    "https://sulsel.dpntimes.com/wp-json/wp/v2/tags"
+)
+
+WP_USERNAME = os.getenv("WP_USERNAME")
+
+WP_APP_PASSWORD = os.getenv("WP_APP_PASSWORD")
+
+POST_STATUS = os.getenv("POST_STATUS", "draft")
+
+DELAY_BETWEEN_POSTS = int(
+    os.getenv("DELAY_BETWEEN_POSTS", 60)
+)
 
 # =========================================
 # LOGGING
@@ -32,19 +65,26 @@ logging.basicConfig(
 CACHE_FILE = "posted.json"
 
 if not os.path.exists(CACHE_FILE):
+
     with open(CACHE_FILE, "w") as f:
         json.dump([], f)
 
 def load_posted():
 
-    with open(CACHE_FILE, "r") as f:
-        return json.load(f)
+    try:
+
+        with open(CACHE_FILE, "r") as f:
+            return json.load(f)
+
+    except:
+        return []
 
 def save_posted(url):
 
     data = load_posted()
 
-    data.append(url)
+    if url not in data:
+        data.append(url)
 
     with open(CACHE_FILE, "w") as f:
         json.dump(data, f)
@@ -54,6 +94,8 @@ def save_posted(url):
 # =========================================
 
 def get_feed():
+
+    logging.info("Fetching RSS Feed...")
 
     feed = feedparser.parse(RSS_FEED_URL)
 
@@ -65,16 +107,36 @@ def get_feed():
 
 def scrape_article(url):
 
+    logging.info(f"Scraping article: {url}")
+
     article = Article(url)
 
     article.download()
     article.parse()
 
+    content = article.text.strip()
+
+    if len(content) < 300:
+        raise Exception("Article content too short")
+
     return {
         "title": article.title,
-        "text": article.text,
+        "text": content,
         "image": article.top_image
     }
+
+# =========================================
+# CLEAN JSON RESPONSE
+# =========================================
+
+def clean_json_response(text):
+
+    text = re.sub(r"```json", "", text)
+    text = re.sub(r"```", "", text)
+
+    text = text.strip()
+
+    return text
 
 # =========================================
 # GEMINI REWRITE
@@ -84,20 +146,23 @@ def rewrite_article(title, content):
 
     prompt = f"""
 Rewrite berita berikut menjadi artikel baru yang unik,
-natural, human readable, dan bukan hasil copy paste.
+natural, human readable, SEO friendly,
+dan bukan hasil copy paste.
 
 WAJIB:
-- Tidak plagiarisme
+- Bahasa Indonesia profesional
 - Gaya media online Indonesia
-- SEO friendly
-- Panjang minimal 900 kata
+- Minimal 900 kata
 - Gunakan heading H2 dan H3
 - Tambahkan FAQ
 - Tambahkan kesimpulan
-- Jangan menyebut rewrite
+- Tambahkan bullet point jika perlu
+- Jangan menyebut rewrite AI
 - Jangan copy struktur asli
+- Artikel harus lolos plagiarism checker
+- Fokus SEO organik Google
 
-Buat output JSON valid seperti ini:
+Buat output JSON VALID tanpa markdown:
 
 {{
   "title": "",
@@ -117,36 +182,55 @@ Isi berita:
 """
 
     random.shuffle(GEMINI_API_KEYS)
+    random.shuffle(MODELS)
 
-    for key in GEMINI_API_KEYS:
+    for api_key in GEMINI_API_KEYS:
 
-        client = genai.Client(api_key=key)
+        api_key = api_key.strip()
+
+        if not api_key:
+            continue
+
+        client = genai.Client(api_key=api_key)
 
         for model in MODELS:
 
+            model = model.strip()
+
             try:
+
+                logging.info(
+                    f"Trying model: {model}"
+                )
 
                 response = client.models.generate_content(
                     model=model,
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         temperature=0.9,
-                        max_output_tokens=6000,
+                        max_output_tokens=7000,
                     )
                 )
 
                 text = response.text
 
-                text = re.sub(r"```json", "", text)
-                text = re.sub(r"```", "", text)
+                text = clean_json_response(text)
 
-                return json.loads(text)
+                result = json.loads(text)
+
+                logging.info(
+                    f"Rewrite success using {model}"
+                )
+
+                return result
 
             except Exception as e:
 
-                logging.error(e)
+                logging.error(
+                    f"[GEMINI ERROR] {model}: {e}"
+                )
 
-                time.sleep(15)
+                time.sleep(10)
 
     return None
 
@@ -159,17 +243,33 @@ def download_image(url):
     if not url:
         return None
 
-    response = requests.get(url)
+    try:
 
-    filename = "featured.jpg"
+        logging.info("Downloading image...")
 
-    with open(filename, "wb") as f:
-        f.write(response.content)
+        response = requests.get(
+            url,
+            timeout=30
+        )
 
-    return filename
+        if response.status_code != 200:
+            return None
+
+        filename = "featured.jpg"
+
+        with open(filename, "wb") as f:
+            f.write(response.content)
+
+        return filename
+
+    except Exception as e:
+
+        logging.error(e)
+
+        return None
 
 # =========================================
-# UPLOAD IMAGE TO WP
+# UPLOAD IMAGE TO WORDPRESS
 # =========================================
 
 def upload_image_to_wp(image_path):
@@ -177,26 +277,44 @@ def upload_image_to_wp(image_path):
     if not image_path:
         return None
 
+    logging.info("Uploading image to WordPress...")
+
     headers = {
-        "Content-Disposition": f'attachment; filename={os.path.basename(image_path)}'
+        "Content-Disposition":
+        f'attachment; filename={os.path.basename(image_path)}'
     }
 
-    with open(image_path, "rb") as img:
+    try:
 
-        response = requests.post(
-            WORDPRESS_MEDIA_URL,
-            headers=headers,
-            data=img,
-            auth=(WP_USERNAME, WP_APP_PASSWORD)
-        )
+        with open(image_path, "rb") as img:
 
-    if response.status_code in [200, 201]:
+            response = requests.post(
+                WORDPRESS_MEDIA_URL,
+                headers=headers,
+                data=img,
+                auth=(WP_USERNAME, WP_APP_PASSWORD),
+                timeout=60
+            )
 
-        return response.json()["id"]
+        if response.status_code in [200, 201]:
 
-    logging.error(response.text)
+            media_id = response.json()["id"]
 
-    return None
+            logging.info(
+                f"Image uploaded ID: {media_id}"
+            )
+
+            return media_id
+
+        logging.error(response.text)
+
+        return None
+
+    except Exception as e:
+
+        logging.error(e)
+
+        return None
 
 # =========================================
 # CREATE TAGS
@@ -208,15 +326,37 @@ def create_tags(tags):
 
     for tag in tags:
 
-        response = requests.post(
-            "https://sulsel.dpntimes.com/wp-json/wp/v2/tags",
-            auth=(WP_USERNAME, WP_APP_PASSWORD),
-            json={"name": tag}
-        )
+        try:
 
-        if response.status_code in [200, 201]:
+            response = requests.post(
+                WORDPRESS_TAGS_URL,
+                auth=(WP_USERNAME, WP_APP_PASSWORD),
+                json={"name": tag},
+                timeout=30
+            )
 
-            tag_ids.append(response.json()["id"])
+            if response.status_code in [200, 201]:
+
+                tag_ids.append(
+                    response.json()["id"]
+                )
+
+            elif response.status_code == 400:
+
+                search = requests.get(
+                    WORDPRESS_TAGS_URL,
+                    params={"search": tag},
+                    auth=(WP_USERNAME, WP_APP_PASSWORD)
+                )
+
+                data = search.json()
+
+                if data:
+                    tag_ids.append(data[0]["id"])
+
+        except Exception as e:
+
+            logging.error(e)
 
     return tag_ids
 
@@ -226,9 +366,13 @@ def create_tags(tags):
 
 def post_to_wordpress(article_data, featured_media):
 
+    logging.info("Posting article to WordPress...")
+
     slug = slugify(article_data["title"])
 
-    tag_ids = create_tags(article_data["tags"])
+    tag_ids = create_tags(
+        article_data.get("tags", [])
+    )
 
     payload = {
         "title": article_data["title"],
@@ -240,21 +384,30 @@ def post_to_wordpress(article_data, featured_media):
         "tags": tag_ids
     }
 
-    response = requests.post(
-        WORDPRESS_URL,
-        auth=(WP_USERNAME, WP_APP_PASSWORD),
-        json=payload
-    )
+    try:
 
-    if response.status_code in [200, 201]:
+        response = requests.post(
+            WORDPRESS_URL,
+            auth=(WP_USERNAME, WP_APP_PASSWORD),
+            json=payload,
+            timeout=60
+        )
 
-        logging.info("SUCCESS POST")
+        if response.status_code in [200, 201]:
 
-        return True
+            logging.info("SUCCESS POST")
 
-    logging.error(response.text)
+            return True
 
-    return False
+        logging.error(response.text)
+
+        return False
+
+    except Exception as e:
+
+        logging.error(e)
+
+        return False
 
 # =========================================
 # MAIN
@@ -262,20 +415,29 @@ def post_to_wordpress(article_data, featured_media):
 
 def main():
 
+    logging.info("BOT STARTED")
+
     entries = get_feed()
 
     posted = load_posted()
 
     for item in entries:
 
-        url = item.link
-
-        if url in posted:
-            continue
-
-        logging.info(f"Processing: {url}")
-
         try:
+
+            url = item.link
+
+            if url in posted:
+
+                logging.info(
+                    f"Already posted: {url}"
+                )
+
+                continue
+
+            logging.info(
+                f"Processing: {url}"
+            )
 
             data = scrape_article(url)
 
@@ -285,11 +447,20 @@ def main():
             )
 
             if not rewritten:
+
+                logging.error(
+                    "Rewrite failed"
+                )
+
                 continue
 
-            image_path = download_image(data["image"])
+            image_path = download_image(
+                data["image"]
+            )
 
-            media_id = upload_image_to_wp(image_path)
+            media_id = upload_image_to_wp(
+                image_path
+            )
 
             success = post_to_wordpress(
                 rewritten,
@@ -300,11 +471,22 @@ def main():
 
                 save_posted(url)
 
+            logging.info(
+                f"Sleeping {DELAY_BETWEEN_POSTS}s"
+            )
+
             time.sleep(DELAY_BETWEEN_POSTS)
 
         except Exception as e:
 
             logging.error(e)
 
+            continue
+
+# =========================================
+# RUN
+# =========================================
+
 if __name__ == "__main__":
+
     main()
