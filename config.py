@@ -1,6 +1,6 @@
 GEMINI_API_KEYS = [
-    "AIzaSyCiDLDkkWA8iaK4fv8TDVPAxVfLePhMk5U",
-    "AIzaSyB8okFrT1Tp_C38ISI5QwuQO50pyd-OPcU"
+    "GEMINI_API_KEY_1",
+    "GEMINI_API_KEY_2"
 ]
 
 MODELS = [
@@ -16,7 +16,7 @@ WORDPRESS_MEDIA_URL = "https://sulsel.dpntimes.com/wp-json/wp/v2/media"
 
 WP_USERNAME = "dpntimes"
 
-WP_APP_PASSWORD = "DPN2021Pantar@01"
+WP_APP_PASSWORD = "xxxxxxxxxx"
 
 POST_STATUS = "draft"
 
