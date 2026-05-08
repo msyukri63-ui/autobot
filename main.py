@@ -46,11 +46,16 @@ for entry in feed.entries[:1]:
     }
 
     # Publish ke WordPress
+    data = {
+        "title": rewritten,
+        "content": rewritten,
+        "status": "draft"
+    }
+
     wp_response = requests.post(
         WP_URL,
         json=data,
         auth=(WP_USER, WP_APP_PASSWORD)
     )
 
-    print("WORDPRESS:")
     print(wp_response.status_code)
