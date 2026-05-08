@@ -209,7 +209,7 @@ def create_tags(tags):
     for tag in tags:
 
         response = requests.post(
-            "https://domainanda.com/wp-json/wp/v2/tags",
+            "https://sulsel.dpntimes.com/wp-json/wp/v2/tags",
             auth=(WP_USERNAME, WP_APP_PASSWORD),
             json={"name": tag}
         )
