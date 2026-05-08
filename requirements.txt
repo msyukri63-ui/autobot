@@ -1,5 +1,5 @@
 feedparser
 requests
 beautifulsoup4
-python-slugify
 google-generativeai
+python-slugify
