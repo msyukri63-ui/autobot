@@ -7,3 +7,4 @@ newspaper3k
 python-slugify
 lxml[html_clean]
 Pillow
+lxml_html_clean
