@@ -1,4 +1,4 @@
-from openai import OpenAI
+import google.generativeai as genai
 import feedparser
 import requests
 
