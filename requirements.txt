@@ -1,5 +1,8 @@
-feedparser
-requests
-beautifulsoup4
 google-genai
+feedparser
+beautifulsoup4
+newspaper3k
+lxml
+requests
 python-slugify
+Pillow
