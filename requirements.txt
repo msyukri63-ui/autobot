@@ -1,8 +1,9 @@
 google-genai
+python-dotenv
 feedparser
+requests
 beautifulsoup4
 newspaper3k
-lxml
-requests
 python-slugify
+lxml[html_clean]
 Pillow
