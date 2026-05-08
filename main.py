@@ -13,8 +13,8 @@ feed = feedparser.parse("https://dpntimes.com/feed")
 
 # WordPress Config
 WP_URL = "https://sulsel.dpntimes.com/wp-json/wp/v2/posts"
-WP_USER = "dpntimes"
-WP_APP_PASSWORD = "DPN2021Pantar@01"
+WP_USER = os.getenv("WP_USER")
+WP_APP_PASSWORD = os.getenv("WP_APP_PASSWORD")
 
 for entry in feed.entries[:1]:
 
