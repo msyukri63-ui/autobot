@@ -1,6 +1,6 @@
 GEMINI_API_KEYS = [
-    "API_KEY_1",
-    "API_KEY_2"
+    "AIzaSyCiDLDkkWA8iaK4fv8TDVPAxVfLePhMk5U",
+    "AIzaSyB8okFrT1Tp_C38ISI5QwuQO50pyd-OPcU"
 ]
 
 MODELS = [
@@ -10,14 +10,14 @@ MODELS = [
 
 RSS_FEED_URL = "https://dpntimes.com/feed"
 
-WORDPRESS_URL = "https://domainanda.com/wp-json/wp/v2/posts"
+WORDPRESS_URL = "https://sulsel.dpntimes.com/wp-json/wp/v2/posts"
 
-WORDPRESS_MEDIA_URL = "https://domainanda.com/wp-json/wp/v2/media"
+WORDPRESS_MEDIA_URL = "https://sulsel.dpntimes.com/wp-json/wp/v2/media"
 
-WP_USERNAME = "admin"
+WP_USERNAME = "dpntimes"
 
-WP_APP_PASSWORD = "xxxx xxxx xxxx"
+WP_APP_PASSWORD = "DPN2021Pantar@01"
 
-POST_STATUS = "publish"
+POST_STATUS = "draft"
 
 DELAY_BETWEEN_POSTS = 60
