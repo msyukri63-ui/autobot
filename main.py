@@ -1,15 +1,20 @@
 import os
 import feedparser
 import google.generativeai as genai
+import requests
 
-# Ambil API Key dari Railway Variables
+# Gemini API
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Model Gemini
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 # RSS Feed
 feed = feedparser.parse("https://dpntimes.com/feed")
+
+# WordPress Config
+WP_URL = "https://sulsel.dpntimes.com/wp-json/wp/v2/posts"
+WP_USER = "dpntimes"
+WP_APP_PASSWORD = "DPN2021Pantar@01"
 
 for entry in feed.entries[:1]:
 
@@ -22,12 +27,28 @@ for entry in feed.entries[:1]:
     {original_title}
     """
 
-    # Generate AI
     response = model.generate_content(prompt)
 
     rewritten = response.text
 
     print("HASIL AI:")
     print(rewritten)
+
+    # Data post WordPress
+    data = {
+        "title": rewritten,
+        "content": rewritten,
+        "status": "draft"
+    }
+
+    # Publish ke WordPress
+    wp_response = requests.post(
+        WP_URL,
+        json=data,
+        auth=(WP_USER, WP_APP_PASSWORD)
+    )
+
+    print("WORDPRESS STATUS:")
+    print(wp_response.status_code)
 
 print("BOT BERHASIL JALAN")
