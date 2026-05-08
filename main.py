@@ -2,7 +2,9 @@ import google.generativeai as genai
 import feedparser
 import requests
 
-client = OpenAI()
+genai.configure(api_key="API_KEY")
+
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 # RSS Feed
 feed = feedparser.parse("https://dpntimes.com/feed")
